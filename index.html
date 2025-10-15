@@ -2,79 +2,83 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Tictact-AI — Expectimax with Human Move Probabilities</title>
+<title>Tictact-AI — Multi-Algorithm Verified</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
-  :root{--bg:#0b0b0b;--panel:#111;--accent:#0f9;--muted:#999;--white:#eee}
-  body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial; background:var(--bg); color:var(--white); margin:0; padding:20px; -webkit-font-smoothing:antialiased}
-  h1{margin:0 0 8px;font-weight:600}
+  :root{--bg:#050505;--panel:#0e0e0e;--muted:#9aa;--white:#e9e9e9;--accent:#0fb;}
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; background:var(--bg); color:var(--white); margin:0; padding:18px}
+  h1{margin:0 0 6px;font-weight:600}
   .wrap{display:flex;gap:18px;flex-wrap:wrap}
-  .board{display:grid;grid-template:repeat(3,120px)/repeat(3,120px); gap:8px; background:transparent}
-  .cell{background:#0e0e0e;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:48px;cursor:pointer; user-select:none; box-shadow:0 4px 10px rgba(0,0,0,.6);}
-  .cell.disabled{cursor:not-allowed; opacity:.6}
-  .panel{background:var(--panel); padding:12px; border-radius:10px; min-width:320px; max-width:540px}
-  .info{font-size:14px;color:var(--muted); margin-bottom:8px}
-  .small{font-size:13px;color:var(--muted)}
-  button{background:#111;border:1px solid #222;color:var(--white);padding:8px 12px;border-radius:8px;cursor:pointer}
-  .topline{display:flex;gap:12px;align-items:center;justify-content:space-between}
-  .grid-wrap{display:flex;gap:16px;align-items:flex-start}
-  .highlight{outline:3px solid rgba(15,153,85,.18); box-shadow:0 6px 20px rgba(0,0,0,.6)}
-  .list{max-height:420px;overflow:auto;padding:6px 0}
-  .seq{padding:8px;border-radius:8px;margin-bottom:8px;background:#0c0c0c}
+  .board{display:grid;grid-template:repeat(3,110px)/repeat(3,110px); gap:8px}
+  .cell{background:#0b0b0b;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:48px;cursor:pointer; user-select:none; box-shadow:0 6px 18px rgba(0,0,0,.6)}
+  .cell.disabled{cursor:not-allowed;opacity:.6}
+  .panel{background:var(--panel); padding:12px; border-radius:10px; min-width:360px; max-width:640px}
   .muted{color:var(--muted)}
-  .stats{display:flex;gap:12px;margin-top:8px}
-  .stat{background:#0c0c0c;padding:8px;border-radius:8px; min-width:84px; text-align:center}
-  .footer{margin-top:12px;color:var(--muted);font-size:13px}
+  .small{font-size:13px;color:var(--muted)}
+  button{background:#111;border:1px solid #1a1a1a;color:var(--white);padding:8px 12px;border-radius:8px;cursor:pointer}
+  .seq{padding:8px;border-radius:8px;margin-bottom:8px;background:#0b0b0b}
+  .stats{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+  .stat{background:#0a0a0a;padding:8px;border-radius:8px; min-width:88px; text-align:center}
+  pre{white-space:pre-wrap;font-family:monospace;font-size:13px}
   @media (max-width:920px){
-    .board{grid-template:repeat(3,90px)/repeat(3,90px)}
+    .board{grid-template:repeat(3,80px)/repeat(3,80px)}
     .cell{font-size:36px}
     .wrap{flex-direction:column}
   }
 </style>
 </head>
 <body>
-  <div class="topline">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
     <div>
-      <h1>Tictact-AI</h1>
-      <div class="info">You are X and always go first. AI is O. After your move the AI evaluates all possible future games using a probabilistic model of human moves and chooses the move that maximizes its expected chance to win.</div>
+      <h1>Tictact-AI — Multi-Algorithm Verified</h1>
+      <div class="small muted">You are X (first). AI is O. After your move AI runs Minimax (alpha-beta), Expectimax (human model), and Monte Carlo rollouts to verify the best move.</div>
     </div>
-    <div>
+    <div style="display:flex;gap:8px">
       <button id="restartBtn">Restart</button>
+      <button id="exhaustBtn">Show full tree</button>
     </div>
   </div>
 
   <div class="wrap">
-    <div class="grid-wrap">
-      <div>
-        <div id="board" class="board" aria-label="TicTacToe board"></div>
-        <div class="small muted" style="margin-top:8px">Click an empty square to play X. The AI will respond automatically.</div>
+    <div>
+      <div id="board" class="board" aria-label="TicTacToe board"></div>
+      <div class="small muted" style="margin-top:8px">Click an empty square to play X. The AI responds automatically with an explained choice.</div>
+    </div>
+
+    <div class="panel">
+      <div><strong>Decision summary</strong></div>
+      <div id="decision" class="small muted" style="margin:8px 0">Waiting for your first move...</div>
+
+      <div class="stats" id="outcomeSummary" style="display:none">
+        <div class="stat"><div class="muted">P(O wins)</div><div id="pO" style="font-weight:700">—</div></div>
+        <div class="stat"><div class="muted">P(X wins)</div><div id="pX" style="font-weight:700">—</div></div>
+        <div class="stat"><div class="muted">P(Draw)</div><div id="pD" style="font-weight:700">—</div></div>
       </div>
 
-      <div class="panel">
-        <div><strong>AI decision</strong></div>
-        <div id="aiDecision" class="small muted" style="margin-top:6px">Waiting for your first move...</div>
+      <hr style="border:none;height:1px;background:#070707;margin:12px 0;border-radius:2px">
 
-        <div class="stats" id="stats" style="display:none">
-          <div class="stat"><div class="muted">P(O wins)</div><div id="pO" style="font-weight:600">—</div></div>
-          <div class="stat"><div class="muted">P(X wins)</div><div id="pX" style="font-weight:600">—</div></div>
-          <div class="stat"><div class="muted">P(Draw)</div><div id="pD" style="font-weight:600">—</div></div>
-        </div>
+      <div><strong>Algorithm outputs</strong></div>
+      <div style="margin-top:8px">
+        <div><strong>Minimax (alpha-beta)</strong></div>
+        <div id="minimaxOut" class="small muted" style="margin-bottom:8px">—</div>
 
-        <hr style="border:none;height:1px;background:#0b0b0b;margin:12px 0;border-radius:2px" />
+        <div><strong>Expectimax (human model)</strong></div>
+        <div id="expectOut" class="small muted" style="margin-bottom:8px">—</div>
 
-        <div><strong>Top likely future games (after AI move)</strong></div>
-        <div class="small muted" style="margin:6px 0 12px">Sequences show moves (pos 0-8), probability, and outcome. Higher probability paths are human-like according to a simple human model.</div>
-        <div id="sequences" class="list"></div>
-        <div class="footer">Model notes: the human-move probabilities prefer immediate wins > blocking > forks > center > corners > edges. The AI assumes future humans behave according to that distribution.</div>
+        <div><strong>Monte Carlo verification</strong></div>
+        <div id="mcOut" class="small muted">—</div>
       </div>
+
+      <hr style="border:none;height:1px;background:#070707;margin:12px 0;border-radius:2px">
+      <div><strong>Top candidate analysis</strong></div>
+      <div id="candidates" style="margin-top:8px"></div>
+
+      <div style="margin-top:10px" class="small muted">Notes: Minimax gives mathematically optimal play against a perfect human. Expectimax models a probable human. Monte Carlo simulates the modeled human as verification.</div>
     </div>
   </div>
 
 <script>
-/***************
- * Game & AI code
- ***************/
-
+/* ---------- Game constants & UI ---------- */
 const WIN_LINES = [
   [0,1,2],[3,4,5],[6,7,8],
   [0,3,6],[1,4,7],[2,5,8],
@@ -82,17 +86,22 @@ const WIN_LINES = [
 ];
 
 const boardEl = document.getElementById('board');
-const aiDecisionEl = document.getElementById('aiDecision');
-const sequencesEl = document.getElementById('sequences');
-const statsEl = document.getElementById('stats');
+const decisionEl = document.getElementById('decision');
+const minimaxOutEl = document.getElementById('minimaxOut');
+const expectOutEl = document.getElementById('expectOut');
+const mcOutEl = document.getElementById('mcOut');
+const candidatesEl = document.getElementById('candidates');
 const pOel = document.getElementById('pO');
 const pXel = document.getElementById('pX');
 const pDel = document.getElementById('pD');
+const outcomeSummary = document.getElementById('outcomeSummary');
 const restartBtn = document.getElementById('restartBtn');
+const exhaustBtn = document.getElementById('exhaustBtn');
 
-let board = Array(9).fill(null); // null | 'X' | 'O'
+let board = Array(9).fill(null); // null|'X'|'O'
 let gameOver = false;
 
+/* ---------- UI helpers ---------- */
 function createBoardUI(){
   boardEl.innerHTML = '';
   for(let i=0;i<9;i++){
@@ -114,6 +123,7 @@ function renderBoard(){
   }
 }
 
+/* ---------- Basic game logic ---------- */
 function checkWinner(b){
   for(const line of WIN_LINES){
     const [a,b1,c] = line;
@@ -122,50 +132,20 @@ function checkWinner(b){
   if(b.every(Boolean)) return 'draw';
   return null;
 }
+function getAvailableMoves(b){ return b.map((v,i)=>v?null:i).filter(v=>v!==null); }
 
-function getAvailableMoves(b){
-  const arr=[];
-  for(let i=0;i<9;i++) if(!b[i]) arr.push(i);
-  return arr;
-}
-
-/* Heuristic for human move preference:
-  - immediate win (very high)
-  - block opponent immediate win (high)
-  - create fork (mid)
-  - block opponent fork (mid)
-  - center (3)
-  - corner (2)
-  - edge (1)
-*/
+/* ---------- Human-move heuristic and softmax ---------- */
 function scoreHumanMove(originalBoard, move){
-  // returns a positive numeric score
-  const b = originalBoard.slice();
-  b[move] = 'X';
-
-  // immediate win?
+  const b = originalBoard.slice(); b[move] = 'X';
   if(checkWinner(b) === 'X') return 1000;
-
-  // would this block an opponent immediate win? simulate O winning next
-  const opp = 'O';
+  // block opponent immediate win
   const avail = getAvailableMoves(originalBoard);
-  let blocksImmediate = false;
-  for(const m of avail){
-    if(m === move) continue;
-    const bb = originalBoard.slice();
-    bb[m] = opp;
-    if(checkWinner(bb) === opp){
-      // If human move prevents that by playing in m, then it's blocking
-      if(move === m) { blocksImmediate = true; break; }
-    }
-  }
-  // simpler blocking: if opponent had an immediate winning move and human plays on it
   const opponentImmediate = avail.filter(m=>{
-    const bb = originalBoard.slice(); bb[m] = opp; return checkWinner(bb) === opp;
+    const bb = originalBoard.slice(); bb[m] = 'O'; return checkWinner(bb) === 'O';
   });
   if(opponentImmediate.includes(move)) return 800;
 
-  // fork detection (human creating two threats)
+  // fork detection
   function countWinningThreats(boardState, player){
     let threats=0;
     for(const m of getAvailableMoves(boardState)){
@@ -176,23 +156,11 @@ function scoreHumanMove(originalBoard, move){
   }
   if(countWinningThreats(b,'X') >= 2) return 450;
 
-  // block opponent fork
-  const afterOppForks = getAvailableMoves(originalBoard).some(m=>{
-    const bb = originalBoard.slice(); bb[m] = 'O';
-    return countWinningThreats(bb,'O') >= 2;
-  });
-  // if human move blocks some fork possibility, give some score
-  if(afterOppForks && countWinningThreats(b,'O') < 2) return 350;
-
-  // center
+  // center, corners, edges preference
   if(move === 4) return 120;
-  // corners
   if([0,2,6,8].includes(move)) return 80;
-  // edges
   return 40;
 }
-
-// softmax convert scores to probabilities (temperature controls spread)
 function softmax(values, temperature=1.0){
   const max = Math.max(...values);
   const exps = values.map(v => Math.exp((v - max) / temperature));
@@ -200,13 +168,47 @@ function softmax(values, temperature=1.0){
   return exps.map(e => e / sum);
 }
 
+/* ---------- Minimax with alpha-beta (perfect play) ---------- */
 /*
- * Expectimax-style evaluator:
- * - At human (X) nodes we treat their move as probabilistic according to the heuristic (softmax).
- * - At AI (O) nodes the AI picks the move that maximizes its expected P(O wins).
- *
- * We return an object: {pO:..., pX:..., pD:...}
- */
+ Returns {score, move}
+ score: +1 if O wins, -1 if X wins, 0 draw (from perspective of O)
+*/
+function minimaxAB(b, player, alpha=-Infinity, beta=Infinity){
+  const winner = checkWinner(b);
+  if(winner){
+    if(winner === 'O') return {score: 1, move: null};
+    if(winner === 'X') return {score: -1, move: null};
+    return {score: 0, move: null};
+  }
+  const avail = getAvailableMoves(b);
+  if(player === 'O'){
+    let bestScore = -Infinity, bestMove = null;
+    for(const mv of avail){
+      b[mv] = 'O';
+      const res = minimaxAB(b, 'X', alpha, beta);
+      b[mv] = null;
+      if(res.score > bestScore){ bestScore = res.score; bestMove = mv; }
+      alpha = Math.max(alpha, bestScore);
+      if(beta <= alpha) break;
+      if(bestScore === 1) break; // can't beat winning
+    }
+    return {score: bestScore, move: bestMove};
+  } else {
+    let bestScore = Infinity, bestMove = null;
+    for(const mv of avail){
+      b[mv] = 'X';
+      const res = minimaxAB(b, 'O', alpha, beta);
+      b[mv] = null;
+      if(res.score < bestScore){ bestScore = res.score; bestMove = mv; }
+      beta = Math.min(beta, bestScore);
+      if(beta <= alpha) break;
+      if(bestScore === -1) break;
+    }
+    return {score: bestScore, move: bestMove};
+  }
+}
+
+/* ---------- Expectimax (probabilistic human) ---------- */
 function evaluateExpectimax(boardState, turn){
   const winner = checkWinner(boardState);
   if(winner){
@@ -216,47 +218,158 @@ function evaluateExpectimax(boardState, turn){
       pD: winner === 'draw' ? 1 : 0
     };
   }
-
   const avail = getAvailableMoves(boardState);
   if(turn === 'X'){
-    // compute heuristic scores and probabilities
     const scores = avail.map(m => scoreHumanMove(boardState, m));
     const probs = softmax(scores, 1.0);
-    // expectation over human moves
     let agg = {pO:0, pX:0, pD:0};
     for(let i=0;i<avail.length;i++){
       const mv = avail[i];
       const prob = probs[i];
       const next = boardState.slice(); next[mv] = 'X';
       const e = evaluateExpectimax(next, 'O');
-      agg.pO += prob * e.pO;
-      agg.pX += prob * e.pX;
-      agg.pD += prob * e.pD;
+      agg.pO += prob * e.pO; agg.pX += prob * e.pX; agg.pD += prob * e.pD;
     }
     return agg;
   } else {
-    // AI chooses the move that maximizes pO (its win chance)
-    let best = null;
+    // AI picks the move that maximizes pO
+    let bestEval = null;
     for(const mv of avail){
       const next = boardState.slice(); next[mv] = 'O';
       const e = evaluateExpectimax(next, 'X');
-      if(!best || e.pO > best.val){
-        best = {move:mv, val:e.pO, eval:e};
-      }
+      if(!bestEval || e.pO > bestEval.pO) bestEval = e;
     }
-    return best.eval;
+    return bestEval;
   }
 }
 
-/*
- * After AI chooses its immediate move, enumerate all possible *future* game leaf paths
- * considering the human's probabilistic choices and AI's deterministic picks.
- *
- * We'll only follow the AI's chosen moves at AI nodes (because that's what AI will do).
- * For human nodes we expand all moves and weight by the human probability model.
- *
- * This function returns an array of {sequence: [{turn:'X'|'O',pos:int}, ...], prob, result}
- */
+/* ---------- Monte Carlo verification ----------
+   For a candidate O-move, simulate many games:
+   - Human moves sampled from softmax human model.
+   - AI follows minimax thereafter (optimal).
+   Return {pO, pX, pD}
+*/
+function monteCarloSim(boardState, candidateMove, sims=400){
+  let oWins = 0, xWins = 0, draws = 0;
+  const rng = Math.random;
+  for(let s=0;s<sims;s++){
+    const b = boardState.slice();
+    b[candidateMove] = 'O';
+    let turn = 'X';
+    while(true){
+      const winner = checkWinner(b);
+      if(winner){
+        if(winner === 'O') oWins++;
+        else if(winner === 'X') xWins++;
+        else draws++;
+        break;
+      }
+      const avail = getAvailableMoves(b);
+      if(turn === 'X'){
+        // sample via softmax human model
+        const scores = avail.map(m => scoreHumanMove(b, m));
+        const probs = softmax(scores, 1.0);
+        // sample index
+        let r = rng();
+        let acc = 0, chosen = avail[avail.length-1];
+        for(let i=0;i<probs.length;i++){
+          acc += probs[i];
+          if(r <= acc){ chosen = avail[i]; break; }
+        }
+        b[chosen] = 'X';
+        turn = 'O';
+      } else {
+        // AI uses minimax (optimal) from here
+        const res = minimaxAB(b, 'O');
+        if(res.move === null){
+          // terminal (shouldn't happen)
+          const w = checkWinner(b);
+          if(w === 'O') oWins++;
+          else if(w === 'X') xWins++;
+          else draws++;
+          break;
+        }
+        b[res.move] = 'O';
+        turn = 'X';
+      }
+    }
+  }
+  const total = sims;
+  return {pO: oWins/total, pX: xWins/total, pD: draws/total};
+}
+
+/* ---------- Enumerate candidate moves and analyze ---------- */
+function analyzeAfterHumanMove(currentBoard){
+  const avail = getAvailableMoves(currentBoard);
+  if(avail.length === 0) return null;
+
+  // 1) Minimax for each candidate (what outcome if O plays that move then both optimal)
+  const minimaxChoices = [];
+  for(const mv of avail){
+    const next = currentBoard.slice(); next[mv] = 'O';
+    const res = minimaxAB(next, 'X'); // from next board, X to move
+    minimaxChoices.push({move: mv, minimaxScore: res.score}); // score: +1 O wins, 0 draw, -1 X wins
+  }
+
+  // 2) Expectimax for each candidate (probabilistic human)
+  const expectChoices = [];
+  for(const mv of avail){
+    const next = currentBoard.slice(); next[mv] = 'O';
+    const e = evaluateExpectimax(next, 'X');
+    expectChoices.push({move: mv, pO: e.pO, pX: e.pX, pD: e.pD});
+  }
+
+  // Choose best per minimax (max score), collect top candidates
+  const maxMinimaxScore = Math.max(...minimaxChoices.map(c=>c.minimaxScore));
+  const minimaxTop = minimaxChoices.filter(c => c.minimaxScore === maxMinimaxScore).map(c=>c.move);
+
+  // Among minimaxTop choose one with best expectimax pO
+  let chosenByMinimaxTie = minimaxTop[0];
+  if(minimaxTop.length > 1){
+    let bestP = -1, bestMv = minimaxTop[0];
+    for(const m of minimaxTop){
+      const ex = expectChoices.find(x=>x.move===m);
+      if(ex.pO > bestP){ bestP = ex.pO; bestMv = m; }
+    }
+    chosenByMinimaxTie = bestMv;
+  }
+
+  // Expectimax best move:
+  const bestExpect = expectChoices.reduce((a,b)=> b.pO > a.pO ? b : a, expectChoices[0]);
+
+  // If minimax best differs from expectimax best, use Monte Carlo to verify top candidates
+  let finalChoice = chosenByMinimaxTie;
+  let finalReason = 'Chosen by minimax (optimal play) with tie-break by expectimax when needed.';
+  if(chosenByMinimaxTie !== bestExpect.move){
+    // run Monte Carlo on both candidates to compare
+    const sims = 600; // reasonable default for verification
+    const mcA = monteCarloSim(currentBoard, chosenByMinimaxTie, sims);
+    const mcB = monteCarloSim(currentBoard, bestExpect.move, sims);
+    // prefer candidate with higher simulated pO
+    if(mcB.pO > mcA.pO + 0.01){ // small margin
+      finalChoice = bestExpect.move;
+      finalReason = `Minimax and Expectimax disagreed. Monte Carlo verification preferred Expectimax candidate (pO ${ (mcB.pO*100).toFixed(1)}% vs ${ (mcA.pO*100).toFixed(1)}%).`;
+    } else {
+      finalChoice = chosenByMinimaxTie;
+      finalReason = `Minimax candidate retained after Monte Carlo verification (pO ${ (mcA.pO*100).toFixed(1)}% vs ${ (mcB.pO*100).toFixed(1)}%).`;
+    }
+    return {
+      minimaxChoices, expectChoices, bestExpect, chosenByMinimaxTie,
+      mcA, mcB, finalChoice, finalReason
+    };
+  } else {
+    // agreement between minimax and expectimax
+    const chosenP = expectChoices.find(e=>e.move===chosenByMinimaxTie);
+    return {
+      minimaxChoices, expectChoices, bestExpect, chosenByMinimaxTie,
+      mcA: null, mcB: null,
+      finalChoice: chosenByMinimaxTie,
+      finalReason: `Minimax and Expectimax agree. Chosen move has estimated P(O wins) ${(chosenP.pO*100).toFixed(1)}%.`
+    };
+  }
+}
+
+/* ---------- Enumerate likely future paths after AI move (same as prior) ---------- */
 function enumerateLeafPaths_afterAIChosen(boardState, turn){
   const result = [];
   function recurse(b, t, path, prob){
@@ -267,7 +380,6 @@ function enumerateLeafPaths_afterAIChosen(boardState, turn){
     }
     const avail = getAvailableMoves(b);
     if(t === 'X'){
-      // human probabilities
       const scores = avail.map(m => scoreHumanMove(b, m));
       const probs = softmax(scores, 1.0);
       for(let i=0;i<avail.length;i++){
@@ -279,15 +391,13 @@ function enumerateLeafPaths_afterAIChosen(boardState, turn){
         path.pop();
       }
     } else {
-      // AI chooses best deterministic move (same logic as evaluateExpectimax)
-      let bestMove = null;
-      let bestVal = -1;
+      // AI chooses best deterministic move (minimax)
+      let bestMove = null; let bestVal = -Infinity;
       for(const mv of avail){
         const next = b.slice(); next[mv] = 'O';
-        const e = evaluateExpectimax(next, 'X');
-        if(e.pO > bestVal){ bestVal = e.pO; bestMove = mv; }
+        const res = minimaxAB(next, 'X');
+        if(res.score > bestVal){ bestVal = res.score; bestMove = mv; }
       }
-      // follow that best move
       const next = b.slice(); next[bestMove] = 'O';
       path.push({turn:'O',pos:bestMove});
       recurse(next, 'X', path, prob);
@@ -298,118 +408,132 @@ function enumerateLeafPaths_afterAIChosen(boardState, turn){
   return result;
 }
 
-/*
- * Top-level: after the human has played, the AI evaluates each candidate AI move (O's moves)
- * simulating that after each AI move the future human moves are probabilistic.
- * It picks the AI move that maximizes pO (AI win probability).
- */
-function aiChooseMoveAndAnalyze(currentBoard){
-  const avail = getAvailableMoves(currentBoard);
-  if(avail.length === 0) return null;
-  let best = null;
-  const moveChoices = [];
-  for(const mv of avail){
-    const next = currentBoard.slice(); next[mv] = 'O';
-    const evalRes = evaluateExpectimax(next, 'X');
-    moveChoices.push({move:mv, eval: evalRes});
-    if(!best || evalRes.pO > best.eval.pO) best = {move:mv, eval:evalRes};
-  }
-  // best now contains the move ai will play (to maximize pO)
-  return {best, choices:moveChoices};
-}
-
-/*********************************
- * UI & game loop logic
- *********************************/
-
+/* ---------- UI: show analysis, then play AI move ---------- */
 function humanMove(i){
   if(gameOver) return;
   if(board[i]) return;
-  // human plays X
   board[i] = 'X';
   renderBoard();
   const winner = checkWinner(board);
-  if(winner){
-    finalizeGame(winner);
-    return;
-  }
-  // AI step: evaluate and choose
-  aiDecisionEl.textContent = 'AI is computing...';
-  // small delay so UI updates to show human move before heavy compute:
-  setTimeout(()=>{
-    const analysis = aiChooseMoveAndAnalyze(board);
-    if(!analysis){
-      finalizeGame(checkWinner(board) || 'draw');
-      return;
-    }
-    const aiMove = analysis.best.move;
-    // Show decision summary
-    aiDecisionEl.innerHTML = `AI chooses position <strong>${aiMove}</strong> (evaluated P(O wins) = <strong>${(analysis.best.eval.pO*100).toFixed(1)}%</strong>).`;
-    statsEl.style.display = 'flex';
-    pOel.textContent = (analysis.best.eval.pO*100).toFixed(1) + '%';
-    pXel.textContent = (analysis.best.eval.pX*100).toFixed(1) + '%';
-    pDel.textContent = (analysis.best.eval.pD*100).toFixed(1) + '%';
+  if(winner){ finalizeGame(winner); return; }
 
-    // AI actually plays the chosen move
+  decisionEl.textContent = 'AI running multi-algorithm analysis...';
+  // allow UI to update
+  setTimeout(()=>{
+    const analysis = analyzeAfterHumanMove(board);
+    if(!analysis){
+      finalizeGame(checkWinner(board)||'draw'); return;
+    }
+
+    // show algorithm outputs
+    // minimax summary
+    const minSummary = analysis.minimaxChoices.map(c=>`[${c.move}: score ${c.minimaxScore}]`).join(' ');
+    minimaxOutEl.innerHTML = `<pre class="muted">${minSummary}</pre>`;
+
+    // expectimax summary
+    const exSummary = analysis.expectChoices.map(c=>`[${c.move}: P(O) ${(c.pO*100).toFixed(1)}% P(X) ${(c.pX*100).toFixed(1)}% D ${(c.pD*100).toFixed(1)}%]`).join(' ');
+    expectOutEl.innerHTML = `<pre class="muted">${exSummary}</pre>`;
+
+    // Monte Carlo if ran
+    if(analysis.mcA !== null){
+      mcOutEl.innerHTML = `<pre class="muted">MonteCarlo(${analysis.chosenByMinimaxTie}): P(O) ${(analysis.mcA.pO*100).toFixed(1)}%  vs  MonteCarlo(${analysis.bestExpect.move}): P(O) ${(analysis.mcB.pO*100).toFixed(1)}%</pre>`;
+    } else {
+      mcOutEl.innerHTML = `<div class="muted">No Monte Carlo needed — minimax & expectimax agreed.</div>`;
+    }
+
+    // present candidates table
+    candidatesEl.innerHTML = '';
+    const table = document.createElement('div');
+    table.className = 'small muted';
+    const rows = [];
+    for(const m of analysis.expectChoices){
+      const mm = analysis.minimaxChoices.find(x=>x.move===m.move);
+      rows.push(`<div class="seq"><div style="display:flex;justify-content:space-between"><div>Move ${m.move}</div><div style="text-align:right">Minimax score: ${mm.minimaxScore} — P(O): ${(m.pO*100).toFixed(1)}%</div></div></div>`);
+    }
+    table.innerHTML = rows.join('');
+    candidatesEl.appendChild(table);
+
+    // final choice
+    const aiMove = analysis.finalChoice;
+    decisionEl.innerHTML = `<strong>AI chooses position ${aiMove}</strong><div class="small muted" style="margin-top:6px">${analysis.finalReason}</div>`;
+
+    // show aggregate expected probabilities for chosen move using expectimax
+    const chosenExpect = analysis.expectChoices.find(e=>e.move===aiMove);
+    outcomeSummary.style.display = 'flex';
+    pOel.textContent = (chosenExpect.pO*100).toFixed(1) + '%';
+    pXel.textContent = (chosenExpect.pX*100).toFixed(1) + '%';
+    pDel.textContent = (chosenExpect.pD*100).toFixed(1) + '%';
+
+    // AI plays chosen move
     board[aiMove] = 'O';
-    // visually highlight AI move
     renderBoard();
     boardEl.children[aiMove].classList.add('highlight');
 
-    // Now enumerate likely future games (after the AI move), list top sequences
+    // show likely future sequences
     const enumerated = enumerateLeafPaths_afterAIChosen(board, 'X');
-    // sort by probability desc and show top 12
     enumerated.sort((a,b)=>b.prob - a.prob);
-    showSequences(enumerated.slice(0, 12));
+    showSequences(enumerated.slice(0,10));
 
     const w2 = checkWinner(board);
     if(w2) finalizeGame(w2);
-  }, 20);
+  }, 10);
 }
 
+/* ---------- Show sequences ---------- */
+const sequencesContainer = document.createElement('div');
 function showSequences(seqList){
-  sequencesEl.innerHTML = '';
+  sequencesContainer.innerHTML = '';
   if(seqList.length === 0){
-    sequencesEl.innerHTML = '<div class="muted">No future sequences (game ended).</div>';
+    sequencesContainer.innerHTML = '<div class="muted">No future sequences (game ended).</div>';
+    candidatesEl.appendChild(sequencesContainer);
     return;
   }
+  // clear previous below AI move display area
+  let html = '';
   for(const s of seqList){
-    const div = document.createElement('div');
-    div.className = 'seq';
     const moves = s.sequence.map(it => `${it.turn}@${it.pos}`).join(' → ');
     const pr = (s.prob*100).toFixed(2) + '%';
     const outcome = s.result === 'draw' ? 'Draw' : (s.result === 'X' ? 'X wins' : 'O wins');
-    div.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><div style="font-family:monospace">${moves || '(no moves)'}</div><div style="text-align:right"><div class="small muted">${pr}</div><div style="font-weight:600">${outcome}</div></div></div>`;
-    sequencesEl.appendChild(div);
+    html += `<div class="seq"><div style="display:flex;justify-content:space-between"><div style="font-family:monospace">${moves || '(no moves)'}</div><div style="text-align:right"><div class="small muted">${pr}</div><div style="font-weight:700">${outcome}</div></div></div></div>`;
   }
+  // place under candidates area
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `<div style="margin-top:10px"><strong>Likely futures (top ${seqList.length})</strong></div>${html}`;
+  candidatesEl.appendChild(wrap);
 }
 
+/* ---------- Finalize ---------- */
 function finalizeGame(winner){
   gameOver = true;
   renderBoard();
   if(winner === 'draw'){
-    aiDecisionEl.innerHTML = `<strong>Game over — Draw</strong>`;
+    decisionEl.innerHTML = `<strong>Game over — Draw</strong>`;
   } else {
-    aiDecisionEl.innerHTML = `<strong>Game over — ${winner} wins</strong>`;
+    decisionEl.innerHTML = `<strong>Game over — ${winner} wins</strong>`;
   }
-  // reveal full final leaf list (optional): enumerate from this finished board returns single terminal path
-  const enumerated = enumerateLeafPaths_afterAIChosen(board, 'X');
-  showSequences(enumerated.slice(0,12));
 }
 
-function restart(){
+/* ---------- Buttons ---------- */
+restartBtn.addEventListener('click', ()=>{
   board = Array(9).fill(null);
   gameOver = false;
-  aiDecisionEl.textContent = 'Waiting for your first move...';
-  sequencesEl.innerHTML = '';
-  statsEl.style.display = 'none';
-  createBoardUI();
-}
+  decisionEl.textContent = 'Waiting for your first move...';
+  minimaxOutEl.textContent = '—';
+  expectOutEl.textContent = '—';
+  mcOutEl.textContent = '—';
+  candidatesEl.innerHTML = '';
+  outcomeSummary.style.display = 'none';
+  renderBoard();
+});
+exhaustBtn.addEventListener('click', ()=>{
+  // Show full expectimax tree root evaluation for current board (small enough)
+  const e = evaluateExpectimax(board, board.includes(null)? (board.filter(x=>x).length % 2 === 0 ? 'X' : 'O') : 'X');
+  alert(`Root expectimax estimate: P(O) ${(e.pO*100).toFixed(2)}%  P(X) ${(e.pX*100).toFixed(2)}%  Draw ${(e.pD*100).toFixed(2)}%`);
+});
 
-restartBtn.addEventListener('click', restart);
-
-// init
+/* ---------- Init ---------- */
 createBoardUI();
+renderBoard();
 
 </script>
 </body>
