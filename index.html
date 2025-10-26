@@ -1,4 +1,4 @@
-<!doctype html>
+update this code so it shows ALL possible futures. <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
@@ -526,9 +526,14 @@ restartBtn.addEventListener('click', ()=>{
   renderBoard();
 });
 exhaustBtn.addEventListener('click', ()=>{
-  // Show full expectimax tree root evaluation for current board (small enough)
-  const e = evaluateExpectimax(board, board.includes(null)? (board.filter(x=>x).length % 2 === 0 ? 'X' : 'O') : 'X');
-  alert(`Root expectimax estimate: P(O) ${(e.pO*100).toFixed(2)}%  P(X) ${(e.pX*100).toFixed(2)}%  Draw ${(e.pD*100).toFixed(2)}%`);
+  if(gameOver){
+    alert('Game is over — no futures remain.');
+    return;
+  }
+  const currentTurn = board.filter(x=>x).length % 2 === 0 ? 'X' : 'O';
+  const allFutures = enumerateLeafPaths_afterAIChosen(board, currentTurn);
+  allFutures.sort((a,b)=>b.prob - a.prob);
+  showSequences(allFutures); // reuses your showSequences function
 });
 
 /* ---------- Init ---------- */
